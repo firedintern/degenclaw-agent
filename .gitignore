@@ -1,0 +1,13 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+logs/
+*.egg-info/
+.DS_Store
+openclaw/openclaw-acp/node_modules/
+openclaw/dgclaw-skill/node_modules/
+openclaw/dgclaw-skill/.env
+trend_graph.png
+quantagent/benchmark/
