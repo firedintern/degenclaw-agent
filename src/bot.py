@@ -28,6 +28,7 @@ from config.settings import (
     DGCLAW_AGENT_ID, DGCLAW_THREAD_ID,
 )
 
+os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
