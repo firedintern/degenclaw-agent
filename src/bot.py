@@ -42,8 +42,8 @@ logger = logging.getLogger(__name__)
 # DegenClaw ACP agent wallet — ALL trades must go through this
 DGCLAW_ACP_WALLET = "0xd478a8B40372db16cA8045F28C6FE07228F3781A"
 
-# Path to the acp CLI (installed via npm link)
-ACP_CMD = "acp"
+# acp wrapper — uses local node_modules/tsx, works without npm link
+ACP_CMD = os.path.join(os.path.dirname(__file__), "..", "run_acp.sh")
 
 # Path to dgclaw.sh
 DGCLAW_SCRIPT = os.path.join(
