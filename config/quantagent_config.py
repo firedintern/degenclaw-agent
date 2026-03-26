@@ -11,7 +11,7 @@ QUANTAGENT_CONFIG = {
 
     # Models — Haiku for fast/cheap sub-agents, Sonnet for final decision
     "agent_llm_model": "claude-haiku-4-5-20251001",
-    "graph_llm_model": "claude-sonnet-4-6",
+    "graph_llm_model": "claude-haiku-4-5-20251001",
 
     # Low temperature = consistent, deterministic signals
     "agent_llm_temperature": 0.1,
