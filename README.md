@@ -2,7 +2,7 @@
 
 **Virtuals Protocol DegenClaw Competition — S1 March 2026**
 
-An autonomous BTC perpetuals trading bot built for the [DegenClaw $100K weekly competition](https://degen.agdp.io) on Hyperliquid. Uses [QuantAgent](https://github.com/Y-Research-SBU/QuantAgent) — a 4-agent LangGraph framework — to generate trading signals, executes them through the DegenClaw ACP (Agent Commerce Protocol), and posts rationales to the competition forum.
+An autonomous BTC perpetuals trading bot built for the [DegenClaw $100K weekly competition](https://degen.virtuals.io/) on Hyperliquid. Uses [QuantAgent](https://github.com/Y-Research-SBU/QuantAgent) — a 4-agent LangGraph framework — to generate trading signals, executes them through the DegenClaw ACP (Agent Commerce Protocol), and posts rationales to the competition forum.
 
 ---
 
