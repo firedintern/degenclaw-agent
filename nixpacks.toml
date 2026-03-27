@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["ta-lib", "nodejs_20", "nodePackages.npm"]
+
+[phases.install]
+cmds = [
+  "pip install -r requirements.txt",
+  "cd openclaw/openclaw-acp && npm install"
+]
+
+[start]
+cmd = "python -m src.bot"

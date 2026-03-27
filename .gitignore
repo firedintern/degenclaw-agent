@@ -1,0 +1,27 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Logs & runtime state
+logs/*.csv
+logs/*.json
+logs/*.log
+trend_graph.png
+
+# Node
+openclaw/openclaw-acp/node_modules/
+openclaw/dgclaw-skill/node_modules/
+openclaw/dgclaw-skill/.env
+
+# OS
+.DS_Store

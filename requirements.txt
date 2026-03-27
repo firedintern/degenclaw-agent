@@ -1,0 +1,26 @@
+# Core
+anthropic
+python-dotenv
+pandas
+numpy
+ta
+TA-Lib
+
+# Hyperliquid
+hyperliquid-python-sdk
+eth-account
+
+# QuantAgent dependencies
+langchain
+langchain-anthropic
+langchain-core
+langgraph
+langgraph-checkpoint
+langgraph-prebuilt
+
+# Utilities
+requests
+aiohttp
+matplotlib
+mplfinance
+scipy
