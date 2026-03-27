@@ -72,6 +72,17 @@ class DegenClawBot:
                 f"@ ${self.current_trade['entry']} | "
                 f"SL={self.current_trade['stop_loss']} TP={self.current_trade['take_profit']}"
             )
+        elif self._has_open_position():
+            # position.json was lost (Railway restart/redeploy) — reconstruct from HL
+            self.current_trade = self._reconstruct_position()
+            if self.current_trade:
+                self.in_position = True
+                self._save_position(self.current_trade)
+                logger.info(
+                    f"Reconstructed lost position state: {self.current_trade['direction']} "
+                    f"@ ${self.current_trade['entry']} | "
+                    f"SL={self.current_trade['stop_loss']} TP={self.current_trade['take_profit']}"
+                )
         logger.info("DegenClaw bot initialised — QuantAgent signals → ACP execution")
 
     def _load_position(self) -> dict | None:
@@ -82,6 +93,60 @@ class DegenClawBot:
         except Exception:
             pass
         return None
+
+    def _reconstruct_position(self) -> dict | None:
+        """Rebuild position state from HL when position.json was lost on restart."""
+        try:
+            hl_wallet = "0x7e086e978fc8b2ea16532a6cc77c610d36ca0c3f"
+            data = self._hl_info({"type": "clearinghouseState", "user": hl_wallet})
+            if not data:
+                return None
+            for p in data.get("assetPositions", []):
+                pos = p.get("position", {})
+                if pos.get("coin") == TRADING_PAIR and float(pos.get("szi", 0)) != 0:
+                    szi = float(pos["szi"])
+                    entry = float(pos["entryPx"])
+                    direction = "SHORT" if szi < 0 else "LONG"
+                    # Estimate ATR-based SL/TP from current ATR (1.5x default)
+                    atr = float(self._get_current_atr())
+                    stop_dist = int(round(1.5 * atr))
+                    tp_dist = int(round(stop_dist * 1.5))
+                    if direction == "SHORT":
+                        sl = int(round(entry + stop_dist))
+                        tp = int(round(entry - tp_dist))
+                    else:
+                        sl = int(round(entry - stop_dist))
+                        tp = int(round(entry + tp_dist))
+                    return {
+                        "timestamp":    datetime.now(timezone.utc).isoformat(),
+                        "symbol":       TRADING_PAIR,
+                        "direction":    direction,
+                        "entry":        entry,
+                        "size_usd":     abs(float(pos.get("positionValue", 0))),
+                        "leverage":     1,
+                        "stop_loss":    sl,
+                        "take_profit":  tp,
+                        "risk_reward":  1.5,
+                        "atr":          atr,
+                        "acp_job_id":   "reconstructed",
+                        "entry_equity": self._get_equity(),
+                    }
+        except Exception as e:
+            logger.warning(f"Position reconstruction failed: {e}")
+        return None
+
+    def _get_current_atr(self) -> float:
+        """Fetch latest ATR from Hyperliquid candles."""
+        try:
+            import pandas as pd
+            import ta
+            from src.data_feed import HyperliquidDataFeed
+            candles = HyperliquidDataFeed().get_candles(TRADING_PAIR, TIMEFRAME, 20)
+            df = pd.DataFrame(candles)
+            atr = ta.volatility.average_true_range(df["high"], df["low"], df["close"], window=14)
+            return float(atr.iloc[-1])
+        except Exception:
+            return 1100.0  # fallback
 
     def _save_position(self, trade: dict | None):
         if trade is None:
