@@ -72,17 +72,6 @@ class DegenClawBot:
                 f"@ ${self.current_trade['entry']} | "
                 f"SL={self.current_trade['stop_loss']} TP={self.current_trade['take_profit']}"
             )
-        elif self._has_open_position():
-            # position.json was lost (Railway restart/redeploy) — reconstruct from HL
-            self.current_trade = self._reconstruct_position()
-            if self.current_trade:
-                self.in_position = True
-                self._save_position(self.current_trade)
-                logger.info(
-                    f"Reconstructed lost position state: {self.current_trade['direction']} "
-                    f"@ ${self.current_trade['entry']} | "
-                    f"SL={self.current_trade['stop_loss']} TP={self.current_trade['take_profit']}"
-                )
         logger.info("DegenClaw bot initialised — QuantAgent signals → ACP execution")
 
     def _load_position(self) -> dict | None:
@@ -197,7 +186,17 @@ class DegenClawBot:
         has_position = self._has_open_position()
 
         if has_position:
-            # Monitor exit conditions for the current trade
+            if not self.current_trade:
+                # position.json lost on restart — reconstruct now (API is live)
+                self.current_trade = self._reconstruct_position()
+                if self.current_trade:
+                    self.in_position = True
+                    self._save_position(self.current_trade)
+                    logger.info(
+                        f"Reconstructed position: {self.current_trade['direction']} "
+                        f"@ ${self.current_trade['entry']} | "
+                        f"SL={self.current_trade['stop_loss']} TP={self.current_trade['take_profit']}"
+                    )
             if self.current_trade:
                 self._monitor_exit(equity)
             else:
