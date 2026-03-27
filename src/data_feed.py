@@ -29,7 +29,20 @@ _INTERVAL_MAP = {
 
 class HyperliquidDataFeed:
     def __init__(self):
-        self.info = Info(constants.MAINNET_API_URL, skip_ws=True)
+        # Retry with backoff — Hyperliquid returns 429 if hit too quickly after restart
+        for attempt in range(5):
+            try:
+                self.info = Info(constants.MAINNET_API_URL, skip_ws=True)
+                return
+            except Exception as e:
+                if attempt == 4:
+                    raise
+                wait = 15 * (attempt + 1)
+                import logging
+                logging.getLogger(__name__).warning(
+                    f"HL init failed ({e}), retrying in {wait}s (attempt {attempt+1}/5)"
+                )
+                time.sleep(wait)
 
     def get_candles(self, symbol: str, interval: str, count: int = 50) -> list[dict]:
         """

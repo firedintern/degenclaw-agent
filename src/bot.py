@@ -136,13 +136,24 @@ class DegenClawBot:
         return None
 
     def _get_current_atr(self) -> float:
-        """Fetch latest ATR from Hyperliquid candles."""
+        """Fetch latest ATR using direct HL API (no SDK, avoids 429 on startup)."""
         try:
             import pandas as pd
             import ta
-            from src.data_feed import HyperliquidDataFeed
-            candles = HyperliquidDataFeed().get_candles(TRADING_PAIR, TIMEFRAME, 20)
-            df = pd.DataFrame(candles)
+            import time as _time
+            interval_ms = 14_400_000  # 4h
+            end_ms = int(_time.time() * 1000)
+            start_ms = end_ms - interval_ms * 25
+            payload = {"type": "candleSnapshot", "req": {
+                "coin": TRADING_PAIR, "interval": "4h",
+                "startTime": start_ms, "endTime": end_ms,
+            }}
+            data = self._hl_info(payload)
+            if not data:
+                return 1100.0
+            df = pd.DataFrame([{
+                "high": float(b["h"]), "low": float(b["l"]), "close": float(b["c"])
+            } for b in data])
             atr = ta.volatility.average_true_range(df["high"], df["low"], df["close"], window=14)
             return float(atr.iloc[-1])
         except Exception:
