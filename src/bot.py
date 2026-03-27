@@ -88,10 +88,12 @@ class DegenClawBot:
         try:
             hl_wallet = "0x7e086e978fc8b2ea16532a6cc77c610d36ca0c3f"
             data = self._hl_info({"type": "clearinghouseState", "user": hl_wallet})
+            logger.info(f"Reconstruct: data={'OK' if data else 'None'}, positions={len(data.get('assetPositions',[])) if data else 0}")
             if not data:
                 return None
             for p in data.get("assetPositions", []):
                 pos = p.get("position", {})
+                logger.info(f"Reconstruct: coin={pos.get('coin')} szi={pos.get('szi')} vs TRADING_PAIR={TRADING_PAIR}")
                 if pos.get("coin") == TRADING_PAIR and float(pos.get("szi", 0)) != 0:
                     szi = float(pos["szi"])
                     entry = float(pos["entryPx"])
