@@ -489,7 +489,7 @@ class DegenClawBot:
 
         cmd = [ACP_CMD, "job", "pay", str(job_id),
                 "--accept", "true", "--content", "Approved", "--json"]
-        result = self._run(cmd, cwd=acp_cwd)
+        result = self._run(cmd, cwd=acp_cwd, timeout=60)
         if result:
             logger.info(f"Payment approved for job {job_id}")
         else:
