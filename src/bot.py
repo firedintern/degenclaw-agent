@@ -88,12 +88,10 @@ class DegenClawBot:
         try:
             hl_wallet = "0x7e086e978fc8b2ea16532a6cc77c610d36ca0c3f"
             data = self._hl_info({"type": "clearinghouseState", "user": hl_wallet})
-            logger.info(f"Reconstruct: data={'OK' if data else 'None'}, positions={len(data.get('assetPositions',[])) if data else 0}")
             if not data:
                 return None
             for p in data.get("assetPositions", []):
                 pos = p.get("position", {})
-                logger.info(f"Reconstruct: coin={pos.get('coin')} szi={pos.get('szi')} vs TRADING_PAIR={TRADING_PAIR}")
                 if pos.get("coin") == TRADING_PAIR and float(pos.get("szi", 0)) != 0:
                     szi = float(pos["szi"])
                     entry = float(pos["entryPx"])
@@ -260,7 +258,7 @@ class DegenClawBot:
             self._close_via_acp(reason="SL")
 
     def _close_via_acp(self, reason: str = "manual"):
-        """Send ACP perp_trade close order."""
+        """Send ACP perp_trade close order and update CSV with realized PnL."""
         requirements = {"action": "close", "pair": TRADING_PAIR}
         logger.info(f"Sending ACP close order ({reason}): {requirements}")
         result = self._acp_job("perp_trade", requirements)
@@ -271,6 +269,20 @@ class DegenClawBot:
         logger.info(f"ACP close job created: {job_id}")
         if job_id:
             self._approve_payment(job_id)
+
+        # Wait briefly for fill to settle, then record PnL
+        time.sleep(3)
+        if self.current_trade:
+            pnl = self._get_realized_pnl(self.current_trade)
+            logger.info(f"Realized PnL after {reason}: ${pnl:.2f}")
+            close_trade(
+                acp_job_id=self.current_trade.get("acp_job_id", ""),
+                status="CLOSED",
+                pnl_usd=pnl,
+            )
+            self.current_trade = None
+            self.in_position = False
+            self._save_position(None)
 
     def _get_unrealized_pnl(self) -> float:
         hl_wallet = "0x7e086e978fc8b2ea16532a6cc77c610d36ca0c3f"
@@ -285,8 +297,8 @@ class DegenClawBot:
     def _on_position_closed(self, equity: float):
         """Update CSV when position closes naturally (TP/SL filled on HL)."""
         trade = self.current_trade
-        pnl = self._get_realized_pnl_from_equity(equity)
-        logger.info(f"Position closed — estimated PnL: ${pnl:.2f}")
+        pnl = self._get_realized_pnl(trade)
+        logger.info(f"Position closed — realized PnL: ${pnl:.2f}")
         close_trade(
             acp_job_id=trade.get("acp_job_id", ""),
             status="CLOSED",
@@ -295,10 +307,39 @@ class DegenClawBot:
         self.current_trade = None
         self._save_position(None)
 
-    def _get_realized_pnl_from_equity(self, current_equity: float) -> float:
-        """Estimate realized PnL as equity change from entry equity."""
-        entry_equity = float(self.current_trade.get("entry_equity", current_equity))
-        return round(current_equity - entry_equity, 2)
+    def _get_realized_pnl(self, trade: dict) -> float:
+        """Get actual realized PnL from Hyperliquid fills since trade entry."""
+        try:
+            hl_wallet = "0x7e086e978fc8b2ea16532a6cc77c610d36ca0c3f"
+            # Parse entry timestamp to ms — fall back to 1h ago
+            ts_str = trade.get("timestamp", "")
+            try:
+                from datetime import datetime, timezone
+                dt = datetime.fromisoformat(ts_str)
+                start_ms = int(dt.timestamp() * 1000)
+            except Exception:
+                start_ms = int(time.time() * 1000) - 3_600_000
+
+            data = self._hl_info({
+                "type": "userFillsByTime",
+                "user": hl_wallet,
+                "startTime": start_ms,
+            })
+            if not data:
+                raise ValueError("No fills data")
+
+            pnl = sum(
+                float(f.get("closedPnl", 0))
+                for f in data
+                if f.get("coin") == TRADING_PAIR
+            )
+            return round(pnl, 2)
+        except Exception as e:
+            logger.warning(f"Could not fetch realized PnL from HL: {e}")
+            # Fallback: equity diff
+            entry_equity = float(trade.get("entry_equity", equity if 'equity' in dir() else 0))
+            current_equity = self._get_equity()
+            return round(current_equity - entry_equity, 2) if entry_equity else 0.0
 
     # ------------------------------------------------------------------ #
     # ACP trade execution

@@ -4,7 +4,7 @@ nixPkgs = ["ta-lib", "nodejs_20", "nodePackages.npm"]
 [phases.install]
 cmds = [
   "pip install -r requirements.txt",
-  "cd openclaw/openclaw-acp && npm install"
+  "cd openclaw/openclaw-acp && HUSKY=0 npm install --ignore-scripts"
 ]
 
 [start]
