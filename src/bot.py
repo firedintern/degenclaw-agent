@@ -521,7 +521,7 @@ class DegenClawBot:
                     return equity
             except Exception:
                 pass
-        return 18.99  # fallback
+        return 0.0  # fallback — 0 means peak won't be set from a bad reading
 
     def _has_open_position(self) -> bool:
         """Check if there's an open BTC position directly from Hyperliquid."""

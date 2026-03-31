@@ -13,7 +13,7 @@ CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL_SECONDS", "300"))  # 5 min defaul
 RISK_PER_TRADE = float(os.getenv("RISK_PER_TRADE", "0.02"))       # 2% of equity
 MAX_LEVERAGE = int(os.getenv("MAX_LEVERAGE", "5"))
 MAX_CONCURRENT = int(os.getenv("MAX_CONCURRENT_POSITIONS", "1"))   # BTC only = 1
-MAX_DRAWDOWN = 0.10                                                 # 10% circuit breaker
+MAX_DRAWDOWN = 0.30                                                 # 30% circuit breaker
 
 # QuantAgent risk-reward mapping
 # Paper uses fixed stop-loss ρ = 0.0005 (0.05%) with r ∈ [1.2, 1.8]
