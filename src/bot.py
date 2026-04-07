@@ -60,6 +60,16 @@ POSITION_FILE = "logs/position.json"
 
 
 class DegenClawBot:
+    # After a position closes, wait this many seconds before requesting a new signal.
+    POST_CLOSE_COOLDOWN = int(os.getenv("POST_CLOSE_COOLDOWN_SECONDS", "3600"))  # 1 hour
+
+    # Max signal attempts before requiring manual restart
+    MAX_SIGNAL_ATTEMPTS = int(os.getenv("MAX_SIGNAL_ATTEMPTS", "5"))
+
+    # Trading hours (UTC/GMT) — only open new positions within this window
+    TRADING_HOUR_START = 7   # 07:00 GMT
+    TRADING_HOUR_END   = 23  # 23:00 GMT
+
     def __init__(self):
         Path("logs").mkdir(exist_ok=True)
         self.bridge       = QuantAgentBridge()
@@ -67,6 +77,11 @@ class DegenClawBot:
         self.peak_equity: float      = 0.0
         self.in_position: bool       = False
         self.current_trade: dict | None = self._load_position()
+        self._api_backoff: int       = 0          # consecutive API failures
+        self._api_backoff_until: float = 0.0      # timestamp: skip signal calls until this
+        self._close_cooldown_until: float = 0.0   # timestamp: cooldown after position close
+        self._signal_attempts: int   = 0          # consecutive no-signal attempts
+        self._halted: bool           = False       # True = needs manual restart
         if self.current_trade:
             self.in_position = True
             logger.info(
@@ -213,14 +228,68 @@ class DegenClawBot:
         # Position just closed — record PnL and clear state
         if self.in_position and self.current_trade:
             self._on_position_closed(equity)
+            self._close_cooldown_until = time.time() + self.POST_CLOSE_COOLDOWN
+            self._signal_attempts = 0
+            self._halted = False
+            logger.info(f"Post-close cooldown: skipping signals for {self.POST_CLOSE_COOLDOWN}s")
 
         self.in_position = False
 
-        # Ask QuantAgent for a signal
-        signal = self.bridge.get_signal()
-        if signal is None:
-            logger.info("No actionable signal from QuantAgent this tick")
+        # Bot halted after too many failed attempts — needs manual restart
+        if self._halted:
+            logger.warning("Bot HALTED — max signal attempts reached. Restart to resume.")
             return
+
+        # Only open new trades during trading hours (07:00–23:00 GMT)
+        utc_hour = datetime.now(timezone.utc).hour
+        if not (self.TRADING_HOUR_START <= utc_hour < self.TRADING_HOUR_END):
+            logger.info(f"Outside trading hours ({self.TRADING_HOUR_START}:00–{self.TRADING_HOUR_END}:00 GMT), current={utc_hour}:00 — skipping signal")
+            return
+
+        # Respect cooldowns before spending API credits
+        now = time.time()
+        if now < self._close_cooldown_until:
+            remaining = int(self._close_cooldown_until - now)
+            logger.info(f"Post-close cooldown active — {remaining}s remaining, skipping signal")
+            return
+        if now < self._api_backoff_until:
+            remaining = int(self._api_backoff_until - now)
+            logger.info(f"API backoff active — {remaining}s remaining, skipping signal")
+            return
+
+        # Ask QuantAgent for a signal
+        try:
+            signal = self.bridge.get_signal()
+        except Exception as e:
+            # Billing/auth or other fatal API errors — exponential backoff
+            self._api_backoff = min(self._api_backoff + 1, 8)
+            wait = min(CHECK_INTERVAL * (2 ** self._api_backoff), 7200)  # max 2 hours
+            self._api_backoff_until = time.time() + wait
+            logger.error(
+                f"API error (backoff #{self._api_backoff}, next retry in {wait}s): {e}"
+            )
+            return
+
+        # Successful API call — reset backoff
+        self._api_backoff = 0
+        self._api_backoff_until = 0.0
+
+        if signal is None:
+            self._signal_attempts += 1
+            logger.info(
+                f"No actionable signal from QuantAgent this tick "
+                f"(attempt {self._signal_attempts}/{self.MAX_SIGNAL_ATTEMPTS})"
+            )
+            if self._signal_attempts >= self.MAX_SIGNAL_ATTEMPTS:
+                self._halted = True
+                logger.warning(
+                    f"HALTED: {self.MAX_SIGNAL_ATTEMPTS} consecutive signal attempts with no result. "
+                    f"Restart the bot to resume trading."
+                )
+            return
+
+        # Got a signal — reset attempt counter
+        self._signal_attempts = 0
 
         logger.info(
             f"SIGNAL: {signal['direction']} {TRADING_PAIR} | "
@@ -295,6 +364,10 @@ class DegenClawBot:
             self.current_trade = None
             self.in_position   = False
             self._save_position(None)
+            self._close_cooldown_until = time.time() + self.POST_CLOSE_COOLDOWN
+            self._signal_attempts = 0
+            self._halted = False
+            logger.info(f"Post-close cooldown: skipping signals for {self.POST_CLOSE_COOLDOWN}s")
 
     def _on_position_closed(self, equity: float):
         """Update CSV when position closes naturally (TP/SL filled on HL)."""
