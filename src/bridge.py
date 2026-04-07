@@ -21,6 +21,7 @@ import os
 import logging
 import pandas as pd
 import ta
+import anthropic
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "quantagent"))
 
@@ -122,6 +123,11 @@ class QuantAgentBridge:
                 "trend_report":     final_state.get("trend_report", ""),
             }
 
+        except (anthropic.AuthenticationError, anthropic.BadRequestError) as e:
+            # Billing/auth errors must NOT be silently swallowed —
+            # re-raise so the caller can back off instead of retrying every tick.
+            logger.error(f"Anthropic API fatal error: {e}")
+            raise
         except Exception as e:
             logger.error(f"Signal generation failed: {e}", exc_info=True)
             return None
