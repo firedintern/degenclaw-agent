@@ -54,7 +54,9 @@ DGCLAW_ENV = os.path.join(
 )
 
 
-POSITION_FILE = "logs/position.json"
+POSITION_FILE  = "logs/position.json"
+CONTROL_FILE   = "logs/control.json"
+BOT_STATE_FILE = "logs/bot_state.json"
 
 
 class DegenClawBot:
@@ -88,6 +90,7 @@ class DegenClawBot:
                 f"SL={self.current_trade['stop_loss']} TP={self.current_trade['take_profit']}"
             )
         logger.info("DegenClaw bot initialised — QuantAgent signals → ACP execution")
+        self._save_bot_state()
 
     def _load_position(self) -> dict | None:
         try:
@@ -191,6 +194,8 @@ class DegenClawBot:
     # ------------------------------------------------------------------ #
 
     def _tick(self):
+        self._check_control()
+        self._save_bot_state()
         equity = self._get_equity()
         if equity > 0:
             self.peak_equity = max(self.peak_equity, equity)
@@ -292,6 +297,53 @@ class DegenClawBot:
         )
 
         self._execute(signal, equity if equity > 0 else 100.0)
+
+    # ------------------------------------------------------------------ #
+    # Admin portal control
+    # ------------------------------------------------------------------ #
+
+    def _check_control(self):
+        """Read control.json written by the admin portal and act on it."""
+        if not os.path.exists(CONTROL_FILE):
+            return
+        try:
+            with open(CONTROL_FILE) as f:
+                cmd = json.load(f)
+            os.remove(CONTROL_FILE)
+        except Exception:
+            return
+
+        action = cmd.get("action")
+        if action == "close":
+            logger.info("Admin portal: manual close requested")
+            if self._has_open_position():
+                self._close_via_acp(reason="manual")
+            else:
+                logger.info("No position open — nothing to close")
+
+        elif action == "resume":
+            logger.info("Admin portal: resuming bot (clearing halt/cooldown)")
+            self._halted = False
+            self._close_cooldown_until = 0.0
+            self._signal_attempts = 0
+            self._api_backoff = 0
+            self._api_backoff_until = 0.0
+
+    def _save_bot_state(self):
+        """Persist bot state so the admin portal can read it."""
+        try:
+            state = {
+                "halted":          self._halted,
+                "in_position":     self.in_position,
+                "cooldown_until":  self._close_cooldown_until,
+                "api_backoff_until": self._api_backoff_until,
+                "signal_attempts": self._signal_attempts,
+                "updated_at":      datetime.now(timezone.utc).isoformat(),
+            }
+            with open(BOT_STATE_FILE, "w") as f:
+                json.dump(state, f)
+        except Exception:
+            pass
 
     def _monitor_exit(self, equity: float):
         """Check price against TP/SL and close via ACP if hit."""
