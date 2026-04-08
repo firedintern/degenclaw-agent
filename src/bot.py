@@ -711,5 +711,7 @@ class DegenClawBot:
 
 
 if __name__ == "__main__":
+    from src.admin import start_admin_thread
+    start_admin_thread()
     bot = DegenClawBot()
     bot.run()

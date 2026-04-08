@@ -373,10 +373,20 @@ def status():
     })
 
 
-def run_admin(port: int = 8080):
+def run_admin(port: int = None):
+    if port is None:
+        port = int(os.getenv("PORT", os.getenv("ADMIN_PORT", "8080")))
     logging.basicConfig(level=logging.INFO)
     app.run(host="0.0.0.0", port=port, debug=False)
 
 
+def start_admin_thread():
+    """Launch the admin portal in a daemon thread (called from bot.py)."""
+    port = int(os.getenv("PORT", os.getenv("ADMIN_PORT", "8080")))
+    t = threading.Thread(target=run_admin, args=(port,), daemon=True, name="admin-portal")
+    t.start()
+    logger.info(f"Admin portal started on port {port}")
+
+
 if __name__ == "__main__":
-    run_admin(int(os.getenv("ADMIN_PORT", "8080")))
+    run_admin()
