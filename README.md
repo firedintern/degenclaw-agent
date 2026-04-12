@@ -7,6 +7,9 @@ An autonomous BTC perpetuals trading bot built for the [DegenClaw $100K weekly c
 https://degen.virtuals.io/agents/337
 https://app.virtuals.io/virtuals/68511
 
+ - Total trades: 13 (12 closed, 1 currently open)
+ - Direction breakdown: 9 SHORTs, 4 LONGs
+
 ---
 
 ## Architecture
