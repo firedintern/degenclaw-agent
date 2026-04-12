@@ -137,7 +137,7 @@ DASHBOARD_HTML = """
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'SF Mono', 'Fira Code', monospace; background: #0d1117; color: #e6edf3; min-height: 100vh; padding: 24px; }
   h1 { font-size: 1.4rem; color: #58a6ff; margin-bottom: 24px; letter-spacing: 0.05em; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
   .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; }
   .card h2 { font-size: 0.75rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
   .metric { font-size: 1.6rem; font-weight: 700; }
@@ -146,7 +146,7 @@ DASHBOARD_HTML = """
   .metric.yellow { color: #d29922; }
   .metric.blue { color: #58a6ff; }
   .sub { font-size: 0.8rem; color: #8b949e; margin-top: 4px; }
-  .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+  .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
   button { padding: 10px 22px; border: none; border-radius: 6px; font-size: 0.9rem; font-family: inherit; cursor: pointer; font-weight: 600; transition: opacity 0.15s; }
   button:hover { opacity: 0.8; }
   .btn-close { background: #da3633; color: #fff; }
@@ -155,16 +155,24 @@ DASHBOARD_HTML = """
   .status-ok   { color: #3fb950; }
   .status-warn { color: #d29922; }
   .status-err  { color: #f85149; }
-  .log { background: #010409; border: 1px solid #21262d; border-radius: 6px; padding: 16px; font-size: 0.75rem; color: #8b949e; max-height: 240px; overflow-y: auto; line-height: 1.6; }
   .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; }
   .tag-long  { background: #1f4b21; color: #3fb950; }
   .tag-short { background: #4b1f1f; color: #f85149; }
   .tag-none  { background: #21262d; color: #8b949e; }
+  .tag-open  { background: #1f3a4b; color: #58a6ff; }
   .divider { border: none; border-top: 1px solid #21262d; margin: 20px 0; }
   #msg { margin-top: 16px; padding: 12px 16px; border-radius: 6px; display: none; font-size: 0.85rem; }
   #msg.ok  { background: #1f4b21; color: #3fb950; display: block; }
   #msg.err { background: #4b1f1f; color: #f85149; display: block; }
   small { color: #6e7681; font-size: 0.7rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  th { color: #8b949e; text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.06em; padding: 8px 10px; border-bottom: 1px solid #21262d; text-align: left; white-space: nowrap; }
+  td { padding: 8px 10px; border-bottom: 1px solid #161b22; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #1c2128; }
+  .pnl-pos { color: #3fb950; }
+  .pnl-neg { color: #f85149; }
+  .pnl-zero { color: #8b949e; }
 </style>
 </head>
 <body>
@@ -178,15 +186,26 @@ DASHBOARD_HTML = """
   </div>
 
   <div class="card">
+    <h2>Peak Equity</h2>
+    <div class="metric" style="color:#d29922">${{ peak_equity }}</div>
+    <div class="sub">Since first trade</div>
+  </div>
+
+  <div class="card">
+    <h2>Net P&amp;L</h2>
+    <div class="metric {{ 'green' if net_pnl >= 0 else 'red' }}">${{ "{:+.2f}".format(net_pnl) }}</div>
+    <div class="sub">vs starting ${{ start_equity }}</div>
+  </div>
+
+  <div class="card">
     <h2>Open Position</h2>
     {% if position %}
       <span class="tag tag-{{ position.direction | lower }}">{{ position.direction }}</span>
-      <div class="metric" style="margin-top:8px">
+      <div class="metric" style="margin-top:8px; font-size:1.2rem">
         {{ position.symbol }} @ ${{ "{:,.0f}".format(position.entry_price) }}
       </div>
       <div class="sub">
-        Size: ${{ "{:,.2f}".format(position.position_value) }} &nbsp;|&nbsp;
-        Lev: {{ position.leverage }}x
+        Size: ${{ "{:,.2f}".format(position.position_value) }} &nbsp;|&nbsp; Lev: {{ position.leverage }}x
       </div>
     {% else %}
       <span class="tag tag-none">FLAT</span>
@@ -200,9 +219,13 @@ DASHBOARD_HTML = """
       <div class="metric {{ 'green' if position.unrealized_pnl >= 0 else 'red' }}">
         ${{ "{:+.2f}".format(position.unrealized_pnl) }}
       </div>
-      <div class="sub">vs entry ${{ "{:,.0f}".format(position.entry_price) }}</div>
+      <div class="sub">
+        SL: ${{ "{:,.0f}".format(bot_pos.stop_loss) if bot_pos else "—" }} &nbsp;|&nbsp;
+        TP: ${{ "{:,.0f}".format(bot_pos.take_profit) if bot_pos else "—" }}
+      </div>
     {% else %}
       <div class="metric" style="color:#8b949e">—</div>
+      <div class="sub">No open position</div>
     {% endif %}
   </div>
 
@@ -216,29 +239,11 @@ DASHBOARD_HTML = """
       <div class="sub">{{ bot_state.cooldown_remaining }}s remaining</div>
     {% else %}
       <div class="metric status-ok">RUNNING</div>
-      <div class="sub">Monitoring every {{ check_interval }}s</div>
+      <div class="sub">Tick every {{ check_interval }}s</div>
     {% endif %}
   </div>
 </div>
 
-{% if position %}
-<div class="card" style="margin-bottom:20px">
-  <h2>Position Details (from bot)</h2>
-  {% if bot_pos %}
-  <div style="font-size:0.8rem; color:#8b949e; line-height:2">
-    Entry: <b style="color:#e6edf3">${{ "{:,.0f}".format(bot_pos.entry) }}</b> &nbsp;|&nbsp;
-    Stop Loss: <b style="color:#f85149">${{ "{:,.0f}".format(bot_pos.stop_loss) }}</b> &nbsp;|&nbsp;
-    Take Profit: <b style="color:#3fb950">${{ "{:,.0f}".format(bot_pos.take_profit) }}</b> &nbsp;|&nbsp;
-    R:R: <b style="color:#58a6ff">{{ bot_pos.risk_reward }}</b><br>
-    Opened: {{ bot_pos.timestamp[:19].replace('T',' ') }} UTC
-  </div>
-  {% else %}
-    <div style="color:#8b949e;font-size:0.8rem">Position file not available</div>
-  {% endif %}
-</div>
-{% endif %}
-
-<hr class="divider">
 <div class="actions">
   {% if position %}
   <button class="btn-close" onclick="doAction('/close', 'Close position now?')">
@@ -255,10 +260,54 @@ DASHBOARD_HTML = """
 
 <div id="msg"></div>
 
-<hr class="divider">
 <div class="card">
-  <h2>Recent Trades (last 5)</h2>
-  <div class="log">{{ trade_log }}</div>
+  <h2 style="margin-bottom:16px">Trade History (last 10)</h2>
+  {% if trades %}
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Date (UTC)</th>
+        <th>Dir</th>
+        <th>Entry</th>
+        <th>Size</th>
+        <th>Lev</th>
+        <th>Stop</th>
+        <th>Target</th>
+        <th>R:R</th>
+        <th>Status</th>
+        <th>PnL</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in trades %}
+      <tr>
+        <td style="color:#6e7681">{{ loop.index }}</td>
+        <td style="color:#8b949e">{{ t.timestamp[:16].replace('T',' ') }}</td>
+        <td><span class="tag tag-{{ t.direction | lower }}">{{ t.direction }}</span></td>
+        <td>${{ "{:,.0f}".format(t.entry_price | float) }}</td>
+        <td>${{ "{:.2f}".format(t.size_usd | float) }}</td>
+        <td>{{ t.leverage }}x</td>
+        <td style="color:#f85149">${{ "{:,.0f}".format(t.stop_loss | float) }}</td>
+        <td style="color:#3fb950">${{ "{:,.0f}".format(t.take_profit | float) }}</td>
+        <td style="color:#58a6ff">{{ t.risk_reward }}</td>
+        <td>
+          {% if t.status == 'OPEN' %}
+            <span class="tag tag-open">OPEN</span>
+          {% else %}
+            <span class="tag" style="background:#21262d;color:#8b949e">CLOSED</span>
+          {% endif %}
+        </td>
+        <td class="{{ 'pnl-pos' if t.pnl_usd | float > 0 else ('pnl-neg' if t.pnl_usd | float < 0 else 'pnl-zero') }}">
+          ${{ "{:+.2f}".format(t.pnl_usd | float) }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <div style="color:#8b949e;font-size:0.8rem">No trades yet.</div>
+  {% endif %}
 </div>
 
 <div style="margin-top:16px"><small>Auto-refreshes every 30s &nbsp;|&nbsp; {{ now_str }} UTC</small></div>
@@ -298,9 +347,9 @@ def dashboard():
     if not _check_auth():
         return jsonify({"error": "Unauthorized"}), 401
 
-    equity   = _get_equity()
-    position = _get_position_from_hl()
-    bot_pos  = _load_position_file()
+    equity    = _get_equity()
+    position  = _get_position_from_hl()
+    bot_pos   = _load_position_file()
     bot_state = _load_bot_state()
 
     # Cooldown remaining
@@ -308,27 +357,37 @@ def dashboard():
     now_ts = time.time()
     bot_state["cooldown_remaining"] = max(0, int(cooldown_until - now_ts))
 
-    # Trade log preview
-    trade_log_str = "No trades yet."
+    # Load trades from CSV
+    trades = []
+    start_equity = 18.99  # known starting balance
     try:
         if os.path.exists("logs/trades.csv"):
-            with open("logs/trades.csv") as f:
-                lines = f.readlines()
-            trade_log_str = "".join(lines[-6:]) if len(lines) > 1 else "No closed trades."
+            import csv as _csv
+            with open("logs/trades.csv", newline="") as f:
+                reader = _csv.DictReader(f)
+                all_trades = list(reader)
+            trades = list(reversed(all_trades[-10:]))  # last 10, newest first
     except Exception:
         pass
 
+    # Peak equity: use bot_state if available (bot tracks this live), else fallback
+    peak_equity = float(bot_state.get("peak_equity", equity))
+    peak_equity = max(peak_equity, equity)
+    net_pnl = round(equity - start_equity, 2)
     check_interval = int(os.getenv("CHECK_INTERVAL_SECONDS", "300"))
 
     return render_template_string(
         DASHBOARD_HTML,
         equity=f"{equity:.2f}",
+        peak_equity=f"{peak_equity:.2f}",
+        net_pnl=net_pnl,
+        start_equity=f"{start_equity:.2f}",
         position=position,
         bot_pos=bot_pos,
         bot_state=bot_state,
         now=now_ts,
         now_str=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
-        trade_log=trade_log_str,
+        trades=trades,
         check_interval=check_interval,
     )
 

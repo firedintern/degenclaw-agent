@@ -338,6 +338,7 @@ class DegenClawBot:
                 "cooldown_until":  self._close_cooldown_until,
                 "api_backoff_until": self._api_backoff_until,
                 "signal_attempts": self._signal_attempts,
+                "peak_equity":     self.peak_equity,
                 "updated_at":      datetime.now(timezone.utc).isoformat(),
             }
             with open(BOT_STATE_FILE, "w") as f:
@@ -475,7 +476,7 @@ class DegenClawBot:
             is_long = signal["direction"] == "LONG"
             side = "long" if is_long else "short"
 
-            # Position size: risk 2% of equity, never exceed 90% of balance
+            # Position size: risk RISK_PER_TRADE of equity, capped at MAX_LEVERAGE * equity
             risk_amount = equity * RISK_PER_TRADE
             stop_distance = abs(signal["entry_price"] - signal["stop_loss"])
             if stop_distance == 0:
@@ -483,7 +484,7 @@ class DegenClawBot:
                 return
 
             size_usd = risk_amount / stop_distance * signal["entry_price"]
-            size_usd = min(size_usd, equity * MAX_LEVERAGE, equity * 0.9)
+            size_usd = min(size_usd, equity * MAX_LEVERAGE)
             size_usd = round(size_usd, 2)
 
             leverage = min(round(size_usd / equity, 1), MAX_LEVERAGE)
