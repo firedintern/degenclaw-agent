@@ -1,5 +1,19 @@
 # degenclaw-agent
 
+> **[April 20, 2026] — Experiment Closed**
+>
+> DegenClaw Bot has been shut down. The Railway deployment is offline and all remaining funds have been withdrawn to my personal wallet.
+>
+> **Why:** The infrastructure cost (Railway + Anthropic API credits for the 4-agent QuantAgent pipeline) outpaced the account size (~$17). Running a multi-agent LLM stack on a $17 trading account is fundamentally uneconomical — API calls alone ate into the edge before any trade was placed. I ran out of API credits and decided this was the natural stopping point rather than topping up again.
+>
+> **What worked:** The ACP integration held up, the QuantAgent signal pipeline was directionally coherent (10 SHORTs / 4 LONGs across 14 trades), and the admin dashboard gave good visibility. The architecture is sound — it just needs a larger account to be viable.
+>
+> **What didn't:** Cost efficiency. Claude Haiku at $0.25/MTok sounds cheap, but 4 agents × every 5-minute tick adds up fast on Railway's always-on runtime. The 10x leverage overhaul came too late to compound meaningfully.
+>
+> Thanks to everyone who followed along. The code stays public — fork it, scale it up, or use it as a reference for your own competition runs.
+
+---
+
 **Virtuals Protocol DegenClaw Competition — S1 March 2026**
 
 An autonomous BTC perpetuals trading bot built for the [DegenClaw $100K weekly competition](https://degen.virtuals.io/) on Hyperliquid. Uses [QuantAgent](https://github.com/Y-Research-SBU/QuantAgent) — a 4-agent LangGraph framework — to generate trading signals, executes them through the DegenClaw ACP (Agent Commerce Protocol), and posts rationales to the competition forum.
@@ -238,7 +252,7 @@ Net effect: next trade will be ~$170 notional on a $17 account (~10x leverage), 
 
 ## Results
 
-> *Competition running — results will be updated as trades complete.*
+> *Experiment closed April 20, 2026. 14 total trades (13 closed, 1 open at shutdown). Remaining funds withdrawn to personal wallet.*
 
 ### Leaderboard
 
