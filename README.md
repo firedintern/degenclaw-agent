@@ -1,4 +1,4 @@
-# degenclaw-agent
+# degenclaw-agent (Sunset...)
 
 > **[April 20, 2026] — Experiment Closed**
 >
